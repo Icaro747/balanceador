@@ -1,0 +1,278 @@
+:root {
+  --bg: #0d1117;
+  --panel: #161b22;
+  --panel-soft: #1f2937;
+  --text: #e6edf3;
+  --muted: #9ca3af;
+  --line: #30363d;
+  --good: #3fb950;
+  --warn: #d29922;
+  --bad: #f85149;
+  --accent: #58a6ff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: radial-gradient(circle at top right, #1a2333 0%, var(--bg) 40%);
+  color: var(--text);
+}
+
+.app {
+  margin: 0 auto;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: 390px 1fr;
+  gap: 16px;
+}
+
+.panel {
+  background: color-mix(in oklab, var(--panel) 88%, black);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+
+h1 {
+  margin: 0 0 4px;
+  font-size: 1.3rem;
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: 1.05rem;
+}
+
+p {
+  margin: 8px 0;
+  color: var(--muted);
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.field label {
+  font-size: 0.9rem;
+  color: #cbd5e1;
+}
+
+input,
+select,
+button {
+  border: 1px solid var(--line);
+  background: #0b1018;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 9px 10px;
+  font: inherit;
+}
+
+input:focus,
+select:focus,
+button:focus {
+  outline: 2px solid color-mix(in oklab, var(--accent) 55%, transparent);
+  outline-offset: 1px;
+}
+
+button {
+  cursor: pointer;
+  background: linear-gradient(180deg, #1f6feb 0%, #1158c7 100%);
+  border-color: #3375d6;
+  font-weight: 600;
+}
+
+button.secondary {
+  background: #1f2937;
+  border-color: #334155;
+}
+
+.muted-btn {
+  background: #111827;
+  border-color: #374151;
+  padding: 7px 9px;
+  font-size: 0.85rem;
+}
+
+.factory-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.factory-row {
+  display: grid;
+  grid-template-columns: 1fr 90px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--panel-soft) 78%, black);
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.small {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  background: color-mix(in oklab, var(--panel-soft) 70%, black);
+}
+
+.card strong {
+  display: block;
+  font-size: 1.1rem;
+  margin-top: 2px;
+}
+
+.pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  border: 1px solid transparent;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.pill.exact {
+  color: #a7f3d0;
+  background: #0f2416;
+  border-color: #14532d;
+}
+
+.pill.approx {
+  color: #fde68a;
+  background: #2a2110;
+  border-color: #854d0e;
+}
+
+.notice {
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid;
+  margin-bottom: 10px;
+  font-size: 0.92rem;
+}
+
+.notice.good {
+  color: #a7f3d0;
+  border-color: #166534;
+  background: rgba(22, 101, 52, 0.18);
+}
+
+.notice.warn {
+  color: #fde68a;
+  border-color: #b45309;
+  background: rgba(180, 83, 9, 0.14);
+}
+
+.notice.bad {
+  color: #fecaca;
+  border-color: #b91c1c;
+  background: rgba(185, 28, 28, 0.14);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 6px;
+  margin-bottom: 12px;
+  background: color-mix(in oklab, var(--panel-soft) 70%, black);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+th {
+  color: #bfdbfe;
+  background: rgba(88, 166, 255, 0.08);
+  font-weight: 650;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.diagram-wrap {
+  display: grid;
+  gap: 10px;
+}
+
+.diagram-card {
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 10px;
+  background: color-mix(in oklab, var(--panel-soft) 74%, black);
+}
+
+.diagram-title {
+  font-size: 0.9rem;
+  color: #dbeafe;
+  margin-bottom: 8px;
+}
+
+.diagram-svg {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  border: 1px dashed #334155;
+  background: #0a0f16;
+  display: block;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86rem;
+}
+
+@media (max-width: 1100px) {
+  .app {
+    grid-template-columns: 1fr;
+  }
+
+  .cards {
+    grid-template-columns: 1fr;
+  }
+}
