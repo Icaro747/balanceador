@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Calculadora de Balanceamento de Esteiras</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <main class="app">
+    <section class="panel" aria-label="Painel de configuracao">
+      <h1>Calculadora de Balanceamento</h1>
+      <p>Divide fluxo usando apenas divisores (÷2, ÷3) e unificadores.</p>
+
+      <div class="grid-2">
+        <div class="field">
+          <label for="beltType">Tipo de esteira</label>
+          <select id="beltType" aria-label="Tipo de esteira">
+            <option value="t1">t1 — 60/min</option>
+            <option value="t2">t2 — 120/min</option>
+            <option value="t3">t3 — 270/min</option>
+            <option value="t4">t4 — 480/min</option>
+            <option value="t5">t5 — 780/min</option>
+            <option value="t6">t6 — 1200/min</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="flowInput">Fluxo total F (itens/min)</label>
+          <input id="flowInput" type="number" min="0.01" step="0.01" value="60">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="depthInput">Profundidade maxima D: <span id="depthValue">4</span></label>
+        <input id="depthInput" type="range" min="2" max="6" value="4">
+      </div>
+
+      <div class="field">
+        <label for="factoryCount">Quantidade de fabricas</label>
+        <input id="factoryCount" type="number" min="1" max="200" step="1" value="5" aria-describedby="factoryCountHint">
+        <p id="factoryCountHint" class="small" style="margin:0">Ajusta a lista: aumenta ou remove fábricas (as extras
+          são retiradas do fim).</p>
+      </div>
+
+      <div class="toolbar">
+        <button id="calculateBtn" type="button">Calcular</button>
+      </div>
+
+      <div class="field">
+        <label>Nomes e pesos</label>
+        <div id="factoryList" class="factory-list"></div>
+      </div>
+
+      <div id="beltPreview" class="notice warn" role="status"></div>
+      <p class="small">Regra de entrada: <span class="mono">N = ceil(F / C)</span>.</p>
+    </section>
+
+    <section class="panel" aria-label="Resultados">
+      <h2>Resultados</h2>
+      <div class="cards">
+        <article class="card">
+          <span class="small">Capacidade por esteira (C)</span>
+          <strong id="capCard">60/min</strong>
+        </article>
+        <article class="card">
+          <span class="small">Esteiras em paralelo (N)</span>
+          <strong id="parallelCard">1</strong>
+        </article>
+        <article class="card">
+          <span class="small">Erro maximo observado</span>
+          <strong id="maxErrorCard">0.0000%</strong>
+        </article>
+      </div>
+
+      <div id="validationNotice" class="notice good"></div>
+
+      <div style="overflow:auto">
+        <table aria-label="Tabela de resultados">
+          <thead>
+            <tr>
+              <th>Fabrica</th>
+              <th>Peso</th>
+              <th>Fracao alvo</th>
+              <th>Fracao obtida</th>
+              <th>Metodo</th>
+              <th>Dispositivos</th>
+              <th>Status</th>
+              <th>Erro</th>
+              <th>Fluxo real (itens/min)</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+      </div>
+
+      <h2>Diagrama de dispositivos</h2>
+      <div id="diagramWrap" class="diagram-wrap"></div>
+    </section>
+  </main>
+
+  <script type="module" src="js/ui.js"></script>
+</body>
+
+</html>
