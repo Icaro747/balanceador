@@ -1,4 +1,5 @@
 import { clamp, formatNumber } from "./utils.js";
+import { buildMinimalRecirculationTopology, countMinimalTopologyDevices } from "./tree.js";
 
 export function findBestFraction(target, depthMax) {
   let best = null;
@@ -66,6 +67,7 @@ export function findRecirculationSolution(factories, depthMax, totalFlow) {
 
   const kValues = normalizeWeightsToIntegerRatios(factories);
   const sumK = kValues.reduce((acc, value) => acc + value, 0);
+  const weightSum = factories.reduce((acc, factory) => acc + factory.weight, 0);
   let bestDen = null;
 
   for (let a = 0; a <= depthMax; a += 1) {
@@ -77,8 +79,8 @@ export function findRecirculationSolution(factories, depthMax, totalFlow) {
       const devices = a + b;
       if (
         !bestDen ||
-        devices < bestDen.devices ||
-        (devices === bestDen.devices && d < bestDen.d)
+        d < bestDen.d ||
+        (d === bestDen.d && devices < bestDen.devices)
       ) {
         bestDen = { a, b, d, devices };
       }
@@ -93,16 +95,30 @@ export function findRecirculationSolution(factories, depthMax, totalFlow) {
   const recirculatedFlow = r > 0 ? (r * totalFlow) / sumK : 0;
   const effectiveInput = totalFlow + recirculatedFlow;
   const leafFlow = effectiveInput / bestDen.d;
-  const totalDevices = bestDen.devices + kValues.filter((k) => k > 1).length;
+  const solutionBase = {
+    mode: r > 0 ? "recirculation" : "direct-exact",
+    a: bestDen.a,
+    b: bestDen.b,
+    d: bestDen.d,
+    kValues,
+    sumK,
+    loopbackCount: r,
+    recirculatedFlow,
+    effectiveInput,
+    leafFlow
+  };
+  const topology = buildMinimalRecirculationTopology(solutionBase, factories, totalFlow);
+  const totalDevices = countMinimalTopologyDevices(topology);
 
   const rows = factories.map((factory, index) => {
     const k = kValues[index];
     const value = k / sumK;
+    const target = factory.weight / weightSum;
     return {
       name: factory.name,
       weight: factory.weight,
-      target: factory.weight / factories.reduce((acc, f) => acc + f.weight, 0),
-      targetFractionText: `${formatNumber((factory.weight / factories.reduce((acc, f) => acc + f.weight, 0)) * 100, 4)}%`,
+      target,
+      targetFractionText: `${formatNumber(target * 100, 4)}%`,
       obtainedFractionText: `${k}/${sumK} (${formatNumber(value * 100, 4)}%)`,
       method: r > 0 ? "Recirculacao" : "Direta",
       devices: totalDevices,
@@ -115,16 +131,8 @@ export function findRecirculationSolution(factories, depthMax, totalFlow) {
   });
 
   return {
-    mode: r > 0 ? "recirculation" : "direct-exact",
-    a: bestDen.a,
-    b: bestDen.b,
-    d: bestDen.d,
-    kValues,
-    sumK,
-    loopbackCount: r,
-    recirculatedFlow,
-    effectiveInput,
-    leafFlow,
+    ...solutionBase,
+    topology,
     rows,
     totalDevices
   };
