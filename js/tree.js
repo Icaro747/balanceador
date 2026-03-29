@@ -120,6 +120,159 @@ export function buildDeviceTree(best, factoryName, color, totalFlow, factoryInde
   };
 }
 
+function buildRecirculationAssignments(recirc) {
+  const assignments = [];
+  recirc.kValues.forEach((k, factoryIndex) => {
+    for (let i = 0; i < k; i += 1) {
+      assignments.push(factoryIndex);
+    }
+  });
+  for (let i = 0; i < recirc.loopbackCount; i += 1) {
+    assignments.push(null);
+  }
+  return assignments;
+}
+
+function countSplitterLeaves(node) {
+  if (!node) {
+    return 0;
+  }
+  if (node.type === "splitter") {
+    return node.children.reduce((acc, child) => acc + countSplitterLeaves(child), 0);
+  }
+  return node.spanLeaves ?? 1;
+}
+
+function collectFactoryLeafStats(node, map) {
+  if (!node) {
+    return;
+  }
+  if (node.type === "factoryLeaf") {
+    const current = map.get(node.factoryIndex) || {
+      factoryIndex: node.factoryIndex,
+      factoryName: node.factoryName,
+      flow: 0,
+      inputCount: 0
+    };
+    current.flow += node.flow;
+    current.inputCount += 1;
+    map.set(node.factoryIndex, current);
+    return;
+  }
+  if (node.type === "splitter") {
+    node.children.forEach((child) => collectFactoryLeafStats(child, map));
+  }
+}
+
+export function buildMinimalRecirculationTopology(recirc, factories, totalFlow) {
+  const factors = [
+    ...Array.from({ length: recirc.b }, () => 3),
+    ...Array.from({ length: recirc.a }, () => 2)
+  ];
+  const assignments = buildRecirculationAssignments(recirc);
+
+  function createTerminalNode(targetFactoryIndex, spanLeaves) {
+    const flow = recirc.leafFlow * spanLeaves;
+    if (targetFactoryIndex === null) {
+      return {
+        type: "loopbackLeaf",
+        flow,
+        spanLeaves
+      };
+    }
+    return {
+      type: "factoryLeaf",
+      factoryIndex: targetFactoryIndex,
+      factoryName: factories[targetFactoryIndex].name,
+      flow,
+      spanLeaves
+    };
+  }
+
+  function buildRange(level, start, spanLeaves) {
+    const firstTarget = assignments[start];
+    let homogeneous = true;
+    for (let i = start + 1; i < start + spanLeaves; i += 1) {
+      if (assignments[i] !== firstTarget) {
+        homogeneous = false;
+        break;
+      }
+    }
+
+    if (homogeneous || level >= factors.length) {
+      return createTerminalNode(firstTarget, spanLeaves);
+    }
+
+    const div = factors[level];
+    const perChild = spanLeaves / div;
+    const children = [];
+    for (let i = 0; i < div; i += 1) {
+      children.push(buildRange(level + 1, start + i * perChild, perChild));
+    }
+
+    return {
+      type: "splitter",
+      div,
+      flowIn: recirc.leafFlow * spanLeaves,
+      flowOutPerChild: recirc.leafFlow * perChild,
+      spanLeaves,
+      children
+    };
+  }
+
+  const child = factors.length
+    ? buildRange(0, 0, recirc.d)
+    : createTerminalNode(assignments[0] ?? null, 1);
+
+  const leafStats = new Map();
+  collectFactoryLeafStats(child, leafStats);
+  const factoryMergers = Array.from(leafStats.values())
+    .filter((entry) => entry.inputCount > 1)
+    .map((entry) => ({
+      type: "factoryMerger",
+      factoryIndex: entry.factoryIndex,
+      factoryName: entry.factoryName,
+      flow: entry.flow,
+      inputCount: entry.inputCount
+    }));
+
+  if (recirc.loopbackCount > 0) {
+    return {
+      type: "sourceMerge",
+      freshFlow: totalFlow,
+      recirculatedFlow: recirc.recirculatedFlow,
+      effectiveFlow: recirc.effectiveInput,
+      factoryMergers,
+      child
+    };
+  }
+
+  return child;
+}
+
+export function countMinimalTopologyDevices(topology) {
+  function countNode(node) {
+    if (!node) {
+      return 0;
+    }
+    if (node.type === "splitter") {
+      return 1 + node.children.reduce((acc, child) => acc + countNode(child), 0);
+    }
+    return 0;
+  }
+
+  if (!topology) {
+    return 0;
+  }
+
+  if (topology.type === "sourceMerge") {
+    const mergerCount = topology.factoryMergers?.length || 0;
+    return 1 + mergerCount + countNode(topology.child);
+  }
+
+  return countNode(topology);
+}
+
 export function buildUnifiedRecirculationTree(recirc, factories, totalFlow) {
   const factors = [
     ...Array.from({ length: recirc.b }, () => 3),

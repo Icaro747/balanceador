@@ -130,6 +130,110 @@ Uma vez escolhido o método (direta ou recirculação), o algoritmo converte rec
 
 ---
 
+### 3.5 Exemplo: 4 fabricas com pesos 1, 1, 1 e 0,5
+
+Este cenario usa **recirculacao** como termo principal. Os termos **loop-back** e **refluxo** podem ser usados como equivalentes para a saida que retorna ao topo da linha.
+
+Pesos configurados:
+
+```text
+1, 1, 1, 0.5
+```
+
+Normalizando para a menor razao inteira:
+
+```text
+1 : 1 : 1 : 0.5  ->  2 : 2 : 2 : 1
+```
+
+Logo, a soma dos ramos uteis e:
+
+```text
+S = 2 + 2 + 2 + 1 = 7
+```
+
+Como a arvore so pode usar divisores por `2` e por `3`, a menor quantidade de folhas finais que comporta `7` ramos uteis com apenas divisao por `2` e:
+
+```text
+d = 8
+```
+
+Portanto, a construcao minima exata precisa de:
+
+- `7` folhas uteis
+- `1` folha de retorno
+
+### Construcao fisica exata
+
+1. O primeiro andar divide a entrada por `2`.
+2. O segundo andar divide cada uma das duas saidas por `2`.
+3. Isso gera `4` ramos de `1/4` do fluxo efetivo da arvore.
+4. Tres desses ramos de `1/4` seguem diretamente para as tres fabricas de peso `1`.
+5. O quarto ramo de `1/4` e dividido por `2` novamente.
+6. Um sub-ramo de `1/8` vai para a fabrica de peso `0.5`.
+7. O outro sub-ramo de `1/8` retorna para a entrada como recirculacao.
+
+Em termos fisicos, a arvore fica:
+
+```text
+Entrada -> /2 -> /2 em ambas as saidas -> 4 ramos de 1/4
+
+3 ramos de 1/4 -> fabricas de peso 1
+1 ramo de 1/4 -> /2 -> 1/8 para a fabrica de peso 0.5
+1 ramo de 1/8 -> retorno para a entrada
+```
+
+### Logica do resultado
+
+Considere:
+
+- `F`: fluxo novo que entra no sistema
+- `E`: fluxo efetivo que percorre a arvore, ja incluindo a recirculacao
+
+Como uma das oito folhas finais retorna ao topo, o fluxo de retorno e:
+
+```text
+Retorno = E/8
+```
+
+O fluxo novo `F` e igual ao fluxo efetivo menos o que foi devolvido para a propria entrada:
+
+```text
+F = E - E/8
+F = 7E/8
+E = 8F/7
+```
+
+Com isso:
+
+- cada ramo de `1/4` da arvore vale `E/4 = 2F/7`
+- o ramo final de `1/8` vale `E/8 = F/7`
+
+Portanto, o resultado liquido correto e:
+
+```text
+Fabrica 1 = 2F/7
+Fabrica 2 = 2F/7
+Fabrica 3 = 2F/7
+Fabrica 4 = F/7
+```
+
+Isso corresponde exatamente a razao desejada:
+
+```text
+2 : 2 : 2 : 1
+```
+
+Ou, voltando para os pesos originais:
+
+```text
+1 : 1 : 1 : 0.5
+```
+
+Esse exemplo mostra por que o retorno nao e desperdicio: ele aumenta o fluxo efetivo dentro da arvore ate que as saidas liquidas atinjam os pesos configurados.
+
+---
+
 ## 4. Ferramentas Desenvolvidas
 
 ### 4.1 Calculadora interativa

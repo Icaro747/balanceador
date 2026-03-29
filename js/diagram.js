@@ -1,5 +1,6 @@
 import { formatNumber } from "./utils.js";
 import {
+  buildMinimalRecirculationTopology,
   buildUnifiedRecirculationTree,
   collectLeafSlots,
   measureSplitTree,
@@ -167,6 +168,149 @@ function drawSplittersDepthFirst(svg, node) {
   if (node.type === "splitter") {
     drawDiamondSplitter(svg, node);
     node.children.forEach((child) => drawSplittersDepthFirst(svg, child));
+  }
+}
+
+function estimateTextWidth(text, fontSize = 12) {
+  return Math.max(24, String(text || "").length * fontSize * 0.58);
+}
+
+function getMinimalNodeWidth(node) {
+  if (node.type === "loopbackLeaf") {
+    const title = estimateTextWidth("LOOP-BACK", 12);
+    const flow = estimateTextWidth(`${formatNumber(node.flow, 3)}/min`, 10);
+    return Math.max(DIAG.factoryW, Math.ceil(Math.max(title, flow) + 34));
+  }
+
+  const title = estimateTextWidth(node.factoryName || "Fabrica", 12);
+  const flow = estimateTextWidth(`${formatNumber(node.flow, 3)}/min`, 10);
+  return Math.max(DIAG.factoryW, Math.ceil(Math.max(title, flow) + 34));
+}
+
+function measureMinimalTopology(node, cfg = {}) {
+  const { siblingGap = 28 } = cfg;
+
+  if (node.type !== "splitter") {
+    node._layoutW = getMinimalNodeWidth(node);
+    node._leaves = node.spanLeaves ?? 1;
+    return { width: node._layoutW, leaves: node._leaves };
+  }
+
+  let totalWidth = 0;
+  let totalLeaves = 0;
+  node.children.forEach((child, index) => {
+    const measured = measureMinimalTopology(child, cfg);
+    totalWidth += measured.width;
+    totalLeaves += measured.leaves;
+    if (index > 0) {
+      totalWidth += siblingGap;
+    }
+  });
+
+  node._layoutW = Math.max(totalWidth, DIAG.diamondR * 2 + 8);
+  node._leaves = totalLeaves;
+  return { width: node._layoutW, leaves: node._leaves };
+}
+
+function layoutMinimalTopology(node, leftX, depth, cfg = {}) {
+  const { levelDy = DIAG.levelDy, marginT = DIAG.marginT, siblingGap = 28 } = cfg;
+  node.cx = leftX + node._layoutW / 2;
+  node.cy = marginT + depth * levelDy;
+
+  if (node.type !== "splitter") {
+    return;
+  }
+
+  let cursor = leftX;
+  node.children.forEach((child) => {
+    layoutMinimalTopology(child, cursor, depth + 1, cfg);
+    cursor += child._layoutW + siblingGap;
+  });
+}
+
+function translateMinimalTopology(node, dx, dy = 0) {
+  node.cx += dx;
+  node.cy += dy;
+  if (node.type === "splitter") {
+    node.children.forEach((child) => translateMinimalTopology(child, dx, dy));
+  }
+}
+
+function childConnectorTopYMinimal(child) {
+  if (child.type === "splitter") {
+    return child.cy - DIAG.diamondR;
+  }
+  return child.cy - DIAG.factoryH / 2;
+}
+
+function drawMinimalBranchEdges(svg, splitter, markerId) {
+  const px = splitter.cx;
+  const py = splitter.cy;
+  const y1 = py + DIAG.diamondR;
+  splitter.children.forEach((child) => {
+    const x2 = child.cx;
+    const y2 = childConnectorTopYMinimal(child);
+    const midY = (y1 + y2) / 2;
+    const d = `M ${px} ${y1} L ${px} ${midY} L ${x2} ${midY} L ${x2} ${y2}`;
+    addPath(svg, d, markerId);
+    addEdgeLabel(svg, x2, midY - 6, `${formatNumber(splitter.flowOutPerChild, 3)}/min`);
+    if (child.type === "splitter") {
+      drawMinimalBranchEdges(svg, child, markerId);
+    }
+  });
+}
+
+function drawMinimalNodes(svg, node, colors) {
+  if (node.type === "splitter") {
+    drawDiamondSplitter(svg, node);
+    node.children.forEach((child) => drawMinimalNodes(svg, child, colors));
+    return;
+  }
+
+  const nodeW = node._layoutW || DIAG.factoryW;
+  const x = node.cx - nodeW / 2;
+  const y = node.cy - DIAG.factoryH / 2;
+
+  if (node.type === "loopbackLeaf") {
+    drawRoundedBlock(
+      svg,
+      x,
+      y,
+      nodeW,
+      DIAG.factoryH,
+      12,
+      "#bef264",
+      "#65a30d",
+      "LOOP-BACK",
+      `${formatNumber(node.flow, 3)}/min`,
+      "#365314",
+      "#365314"
+    );
+    return;
+  }
+
+  drawRoundedBlock(
+    svg,
+    x,
+    y,
+    nodeW,
+    DIAG.factoryH,
+    12,
+    colors[node.factoryIndex] || "#14532d",
+    "#0f172a",
+    node.factoryName,
+    `${formatNumber(node.flow, 3)}/min`,
+    "#0b1020",
+    "#f8fafc"
+  );
+}
+
+function collectMinimalNodes(node, predicate, out) {
+  if (predicate(node)) {
+    out.push(node);
+  }
+  if (node.type === "splitter") {
+    node.children.forEach((child) => collectMinimalNodes(child, predicate, out));
   }
 }
 
@@ -535,13 +679,179 @@ function renderRecirculationDiagram(solution, factories, totalFlow, colors) {
   return wrapper;
 }
 
+function renderMinimalRecirculationDiagram(solution, factories, totalFlow, colors) {
+  const wrapper = document.createElement("article");
+  wrapper.className = "diagram-card";
+  const title = document.createElement("div");
+  title.className = "diagram-title";
+  title.textContent =
+    `Diagrama unico do cenario - ${solution.loopbackCount} saida(s) em loop-back, fluxo recirculado ${formatNumber(solution.recirculatedFlow, 4)}/min`;
+  wrapper.appendChild(title);
+
+  const topology = solution.topology || buildMinimalRecirculationTopology(solution, factories, totalFlow);
+  const splitRoot = topology.type === "sourceMerge" ? topology.child : topology;
+
+  if (!splitRoot || splitRoot.type !== "splitter") {
+    const note = document.createElement("p");
+    note.className = "small";
+    note.textContent = "Cenario trivial sem divisores: fluxo segue direto para um unico destino.";
+    wrapper.appendChild(note);
+    return wrapper;
+  }
+
+  const markerId = `arrow-rec-min-${Math.random().toString(36).slice(2, 9)}`;
+  const svg = createSvgElement("svg", {
+    class: "diagram-svg",
+    role: "img",
+    "aria-label": "Diagrama unificado com recirculacao"
+  });
+  const defs = createSvgElement("defs");
+  const marker = createSvgElement("marker", {
+    id: markerId,
+    markerWidth: 10,
+    markerHeight: 7,
+    refX: 10,
+    refY: 3.5,
+    orient: "auto"
+  });
+  marker.appendChild(createSvgElement("polygon", { points: "0 0, 10 3.5, 0 7", fill: "#cbd5e1" }));
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+
+  const subtitle = createSvgElement("text", {
+    x: DIAG.marginL,
+    y: 28,
+    fill: "#93c5fd",
+    "font-size": 11
+  });
+  subtitle.textContent =
+    `d=${solution.d}, sum(k)=${solution.sumK}, r=${solution.loopbackCount} (cada ramo final ${formatNumber(solution.leafFlow, 4)}/min).`;
+  svg.appendChild(subtitle);
+
+  const rootMarginT = 220;
+  const siblingGap = 34;
+  measureMinimalTopology(splitRoot, { siblingGap });
+  layoutMinimalTopology(splitRoot, 0, 0, {
+    marginT: rootMarginT,
+    levelDy: 126,
+    siblingGap
+  });
+
+  let mergeCx = splitRoot.cx;
+  const mergeTop = 96;
+  const mergeBottom = mergeTop + DIAG.mergerH;
+  const hubGap = 96;
+  let mergeLeft = mergeCx - DIAG.mergerW / 2;
+  let mergeRight = mergeCx + DIAG.mergerW / 2;
+  let freshX = mergeLeft - hubGap - DIAG.entryW;
+  const freshY = mergeTop;
+
+  if (freshX < DIAG.marginL + 24) {
+    const shift = DIAG.marginL + 24 - freshX;
+    translateMinimalTopology(splitRoot, shift, 0);
+    mergeCx = splitRoot.cx;
+    mergeLeft = mergeCx - DIAG.mergerW / 2;
+    mergeRight = mergeCx + DIAG.mergerW / 2;
+    freshX = mergeLeft - hubGap - DIAG.entryW;
+  }
+
+  const allNodes = [];
+  collectMinimalNodes(splitRoot, () => true, allNodes);
+  const minNodeLeft = allNodes.reduce((acc, node) => {
+    const left = node.type === "splitter"
+      ? node.cx - DIAG.diamondR
+      : node.cx - ((node._layoutW || DIAG.factoryW) / 2);
+    return Math.min(acc, left);
+  }, Number.POSITIVE_INFINITY);
+  const maxNodeRight = allNodes.reduce((acc, node) => {
+    const right = node.type === "splitter"
+      ? node.cx + DIAG.diamondR
+      : node.cx + ((node._layoutW || DIAG.factoryW) / 2);
+    return Math.max(acc, right);
+  }, Number.NEGATIVE_INFINITY);
+  const loopReturnX = Math.max(maxNodeRight + 92, mergeRight + 180);
+
+  drawRoundedBlock(
+    svg,
+    freshX,
+    freshY,
+    DIAG.entryW,
+    DIAG.entryH,
+    10,
+    "#2563eb",
+    "#1d4ed8",
+    "ENTRADA NOVA",
+    `F = ${formatNumber(totalFlow, 3)}/min`,
+    "#eff6ff",
+    "#dbeafe"
+  );
+  drawRoundedBlock(
+    svg,
+    mergeLeft,
+    mergeTop,
+    DIAG.mergerW,
+    DIAG.mergerH,
+    11,
+    "#4c1d95",
+    "#6d28d9",
+    "UNIFICADOR",
+    `E = ${formatNumber(solution.effectiveInput, 3)}/min`,
+    "#f5f3ff",
+    "#ddd6fe"
+  );
+
+  const freshMidY = freshY + DIAG.entryH / 2;
+  const mergeMidY = mergeTop + DIAG.mergerH / 2;
+  addPath(svg, `M ${freshX + DIAG.entryW} ${freshMidY} L ${mergeLeft} ${mergeMidY}`, markerId);
+  addPath(svg, `M ${mergeCx} ${mergeBottom} L ${mergeCx} ${splitRoot.cy - DIAG.diamondR}`, markerId);
+
+  const loopLeaves = [];
+  collectMinimalNodes(splitRoot, (node) => node.type === "loopbackLeaf", loopLeaves);
+  loopLeaves.forEach((leaf, index) => {
+    const startX = leaf.cx + ((leaf._layoutW || DIAG.factoryW) / 2);
+    const startY = leaf.cy;
+    const returnJoinY = mergeMidY + 22 + index * 22;
+    const d = `M ${startX} ${startY} L ${loopReturnX} ${startY} L ${loopReturnX} ${returnJoinY} L ${mergeRight} ${returnJoinY} L ${mergeRight} ${mergeMidY}`;
+    addPath(svg, d, markerId);
+    addEdgeLabel(svg, loopReturnX - 20, returnJoinY - 6, `F_recirc = ${formatNumber(leaf.flow, 3)}/min`);
+  });
+
+  drawMinimalBranchEdges(svg, splitRoot, markerId);
+  drawMinimalNodes(svg, splitRoot, colors);
+
+  const legend = createSvgElement("text", {
+    x: DIAG.marginL,
+    y: mergeTop - 18,
+    fill: "#fbbf24",
+    "font-size": 11
+  });
+  legend.textContent = `Loop-back: ${solution.loopbackCount} saida(s) retornam ao topo (F_recirc=${formatNumber(solution.recirculatedFlow, 4)}/min).`;
+  svg.appendChild(legend);
+
+  const deepestY = allNodes.reduce((acc, node) => {
+    const bottom = node.type === "splitter"
+      ? node.cy + DIAG.diamondR
+      : node.cy + DIAG.factoryH / 2;
+    return Math.max(acc, bottom);
+  }, mergeBottom);
+
+  const minX = Math.min(minNodeLeft, freshX, mergeLeft) - 44;
+  const maxX = Math.max(maxNodeRight, loopReturnX, freshX + DIAG.entryW, mergeRight) + 72;
+  const minY = Math.min(16, mergeTop - 62);
+  const maxY = Math.max(360, deepestY + 86);
+  svg.setAttribute("viewBox", `${minX} ${minY} ${maxX - minX} ${maxY - minY}`);
+
+  wrapper.appendChild(svg);
+  return wrapper;
+}
+
 export function renderDiagrams(refs, results, scenario = null) {
   refs.diagramWrap.innerHTML = "";
   if (scenario && scenario.mode === "recirculation" && scenario.recirc) {
     const factories = scenario.factories || [];
     const colors = results.map((row) => row.color || "#14532d");
     refs.diagramWrap.appendChild(
-      renderRecirculationDiagram(scenario.recirc, factories, scenario.totalFlow, colors)
+      renderMinimalRecirculationDiagram(scenario.recirc, factories, scenario.totalFlow, colors)
     );
     return;
   }
