@@ -4,6 +4,7 @@ import {
   buildMinimalRecirculationTopology,
   buildDeviceTree,
   buildUnifiedRecirculationTree,
+  countMinimalTopologyDevices,
   collectLeafSlots
 } from "../js/tree.js";
 import { findRecirculationSolution } from "../js/math.js";
@@ -144,5 +145,29 @@ describe("buildMinimalRecirculationTopology", () => {
     });
     expect(topology.child.children).toHaveLength(3);
     expect(topology.child.children.every((child) => child.type === "splitter")).toBe(true);
+  });
+
+  it("counts factory merger cascades even when topology has no sourceMerge (weights 1 and 0.5)", () => {
+    const factories = [
+      { name: "Fabrica 1", weight: 1 },
+      { name: "Fabrica 2", weight: 0.5 }
+    ];
+    const solution = findRecirculationSolution(factories, 4, 60);
+    const topology = buildMinimalRecirculationTopology(solution, factories, 60);
+
+    expect(topology.type).toBe("splitter");
+    expect(countMinimalTopologyDevices(topology)).toBe(2);
+  });
+
+  it("counts cascaded mergers for repeated factory leaves (weights 1 and 0.8)", () => {
+    const factories = [
+      { name: "Fabrica 1", weight: 1 },
+      { name: "Fabrica 2", weight: 0.8 }
+    ];
+    const solution = findRecirculationSolution(factories, 4, 60);
+    const topology = buildMinimalRecirculationTopology(solution, factories, 60);
+
+    expect(topology.type).toBe("splitter");
+    expect(countMinimalTopologyDevices(topology)).toBe(4);
   });
 });

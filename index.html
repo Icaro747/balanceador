@@ -4,101 +4,232 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Calculadora de Balanceamento de Esteiras</title>
+  <title data-i18n="app.title">Suite de Solucoes de Vazao</title>
   <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
-  <main class="app">
-    <section class="panel" aria-label="Painel de configuracao">
-      <h1>Calculadora de Balanceamento</h1>
-      <p>Divide fluxo usando apenas divisores (÷2, ÷3) e unificadores.</p>
+  <div class="page-shell">
+    <header class="app-header">
+      <div class="app-header-top">
+        <div class="header-copy">
+          <p class="eyebrow" data-i18n="header.eyebrow">Suite de solucoes</p>
+          <h1 data-i18n="header.title">Estudos de vazao e balanceamento</h1>
+          <p data-i18n="header.description">
+            Use a navegacao abaixo para alternar entre as solucoes para problemas diferentes.
+          </p>
+        </div>
 
-      <div class="grid-2">
-        <div class="field">
-          <label for="beltType">Tipo de esteira</label>
-          <select id="beltType" aria-label="Tipo de esteira">
-            <option value="t1">t1 — 60/min</option>
-            <option value="t2">t2 — 120/min</option>
-            <option value="t3">t3 — 270/min</option>
-            <option value="t4">t4 — 480/min</option>
-            <option value="t5">t5 — 780/min</option>
-            <option value="t6">t6 — 1200/min</option>
+        <div class="header-tools">
+          <label for="languageSelect" class="small" data-i18n="language.label">Idioma</label>
+          <select id="languageSelect" data-i18n-aria-label="language.ariaLabel" aria-label="Selecionar idioma">
+            <option value="pt-BR" data-i18n="language.optionPtBr">Portugues (Brasil)</option>
+            <option value="en" data-i18n="language.optionEn">English</option>
           </select>
         </div>
-        <div class="field">
-          <label for="flowInput">Fluxo total F (itens/min)</label>
-          <input id="flowInput" type="number" min="0.01" step="0.01" value="60">
-        </div>
       </div>
 
-      <div class="field">
-        <label for="depthInput">Profundidade maxima D: <span id="depthValue">4</span></label>
-        <input id="depthInput" type="range" min="2" max="6" value="4">
-      </div>
+      <nav class="solution-nav" data-i18n-aria-label="nav.ariaLabel" aria-label="Navegacao entre solucoes">
+        <a class="solution-link" data-route-link="balanceamento" href="#/balanceamento" data-i18n="nav.balance">
+          Balanceamento de esteiras
+        </a>
+        <a class="solution-link" data-route-link="vazao" href="#/vazao" data-i18n="nav.throughput">
+          Entradas e saidas por minuto
+        </a>
+      </nav>
+    </header>
 
-      <div class="field">
-        <label for="factoryCount">Quantidade de fabricas</label>
-        <input id="factoryCount" type="number" min="1" max="200" step="1" value="5" aria-describedby="factoryCountHint">
-        <p id="factoryCountHint" class="small" style="margin:0">Ajusta a lista: aumenta ou remove fábricas (as extras
-          são retiradas do fim).</p>
-      </div>
+    <section class="route-panel" data-route="balanceamento">
+      <main class="app">
+        <section class="panel" data-i18n-aria-label="balance.configPanelAria" aria-label="Painel de configuracao">
+          <h2 data-i18n="balance.title">Calculadora de balanceamento</h2>
+          <p data-i18n="balance.description">Divide fluxo usando apenas divisores (2 e 3) e unificadores.</p>
 
-      <div class="toolbar">
-        <button id="calculateBtn" type="button">Calcular</button>
-      </div>
+          <div class="grid-2">
+            <div class="field">
+              <label for="beltType" data-i18n="balance.beltTypeLabel">Tipo de esteira</label>
+              <select id="beltType" data-i18n-aria-label="balance.beltTypeAria" aria-label="Tipo de esteira">
+                <option value="t1">t1 - 60/min</option>
+                <option value="t2">t2 - 120/min</option>
+                <option value="t3">t3 - 270/min</option>
+                <option value="t4">t4 - 480/min</option>
+                <option value="t5">t5 - 780/min</option>
+                <option value="t6">t6 - 1200/min</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="flowInput" data-i18n="balance.flowInputLabel">Fluxo total F (itens/min)</label>
+              <input id="flowInput" type="number" min="0.01" step="0.01" value="60">
+            </div>
+          </div>
 
-      <div class="field">
-        <label>Nomes e pesos</label>
-        <div id="factoryList" class="factory-list"></div>
-      </div>
+          <div class="field">
+            <label for="manualLanesInput" data-i18n="balance.manualLanesLabel">Esteiras de entrada manuais (N_manual)</label>
+            <input id="manualLanesInput" type="number" min="1" step="1" value="1" aria-describedby="manualLanesHint">
+            <p id="manualLanesHint" class="small" style="margin:0" data-i18n-html="balance.manualLanesHintHtml">
+              O sistema aplica <span class="mono">N = max(ceil(F/C), N_manual)</span> e divide o fluxo igualmente por linha.
+            </p>
+          </div>
 
-      <div id="beltPreview" class="notice warn" role="status"></div>
-      <p class="small">Regra de entrada: <span class="mono">N = ceil(F / C)</span>.</p>
+          <div class="field">
+            <label for="depthInput"><span data-i18n="balance.depthLabel">Profundidade maxima D:</span> <span id="depthValue">4</span></label>
+            <input id="depthInput" type="range" min="2" max="6" value="4" aria-describedby="depthHint">
+            <p id="depthHint" class="small" style="margin:0" data-i18n="balance.depthHint">
+              Quanto maior a profundidade, maior a dificuldade de implementacao.
+            </p>
+          </div>
+
+          <div class="field">
+            <label for="factoryCount" data-i18n="balance.factoryCountLabel">Quantidade de fabricas</label>
+            <input id="factoryCount" type="number" min="1" max="200" step="1" value="5" aria-describedby="factoryCountHint">
+            <p id="factoryCountHint" class="small" style="margin:0" data-i18n="balance.factoryCountHint">
+              Ajusta a lista: aumenta ou remove fabricas; as extras sao retiradas do fim.
+            </p>
+          </div>
+
+          <div class="toolbar">
+            <button id="calculateBtn" type="button" data-i18n="balance.calculate">Calcular</button>
+          </div>
+
+          <div class="field">
+            <label data-i18n="balance.namesAndWeights">Nomes e pesos</label>
+            <div id="factoryList" class="factory-list"></div>
+          </div>
+
+          <div id="beltPreview" class="notice warn" role="status"></div>
+          <p class="small" data-i18n-html="balance.entryRuleHtml">
+            Regra de entrada: <span class="mono">N = ceil(F / C)</span>.
+          </p>
+        </section>
+
+        <section class="panel" data-i18n-aria-label="balance.resultsPanelAria" aria-label="Resultados">
+          <h2 data-i18n="balance.resultsTitle">Resultados</h2>
+          <div class="cards">
+            <article class="card">
+              <span class="small" data-i18n="balance.cardCapacity">Capacidade por esteira (C)</span>
+              <strong id="capCard">60/min</strong>
+            </article>
+            <article class="card">
+              <span class="small" data-i18n="balance.cardParallel">Esteiras em paralelo (N)</span>
+              <strong id="parallelCard">1</strong>
+            </article>
+            <article class="card">
+              <span class="small" data-i18n="balance.cardMaxError">Erro maximo observado</span>
+              <strong id="maxErrorCard">0.0000%</strong>
+            </article>
+          </div>
+
+          <h2 data-i18n="balance.diagramTitle">Diagrama de dispositivos</h2>
+          <div id="diagramWrap" class="diagram-wrap"></div>
+
+          <div id="validationNotice" class="notice good"></div>
+
+          <article id="scenarioSummary" class="scenario-summary" aria-live="polite"></article>
+
+          <div class="table-controls">
+            <button id="toggleAdvancedColumnsBtn" class="muted-btn" type="button" aria-expanded="false">
+              Mostrar dados tecnicos da tabela
+            </button>
+            <span class="small" data-i18n="balance.tableControlsHelp">
+              As colunas tecnicas ficam ocultas por padrao para facilitar leitura.
+            </span>
+          </div>
+
+          <div class="results-table-wrap">
+            <table id="resultsTable" class="results-table" data-i18n-aria-label="balance.tableAriaLabel" aria-label="Tabela de resultados">
+              <thead>
+                <tr>
+                  <th data-i18n="balance.tableFactory">Fabrica</th>
+                  <th data-i18n="balance.tableWeight">Peso</th>
+                  <th data-i18n="balance.tableTargetFraction">Fracao alvo</th>
+                  <th data-i18n="balance.tableObtainedFraction">Fracao obtida</th>
+                  <th class="advanced-col" data-i18n="balance.tableMethod">Metodo</th>
+                  <th class="advanced-col" data-i18n="balance.tableDevices">Dispositivos</th>
+                  <th class="advanced-col" data-i18n="balance.tableStatus">Status</th>
+                  <th class="advanced-col" data-i18n="balance.tableError">Erro</th>
+                  <th data-i18n="balance.tableRealFlow">Fluxo real (itens/min)</th>
+                </tr>
+              </thead>
+              <tbody id="resultsBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
     </section>
 
-    <section class="panel" aria-label="Resultados">
-      <h2>Resultados</h2>
-      <div class="cards">
-        <article class="card">
-          <span class="small">Capacidade por esteira (C)</span>
-          <strong id="capCard">60/min</strong>
-        </article>
-        <article class="card">
-          <span class="small">Esteiras em paralelo (N)</span>
-          <strong id="parallelCard">1</strong>
-        </article>
-        <article class="card">
-          <span class="small">Erro maximo observado</span>
-          <strong id="maxErrorCard">0.0000%</strong>
-        </article>
+    <section class="route-panel" data-route="vazao" hidden>
+      <div class="throughput-layout">
+        <section class="panel" data-i18n-aria-label="throughput.configPanelAria" aria-label="Configuracao da solucao de vazao">
+          <p class="eyebrow" data-i18n="throughput.eyebrow">Nova solucao</p>
+          <h2 data-i18n="throughput.title">Conversor de entradas e saidas</h2>
+          <p data-i18n-html="throughput.descriptionHtml">
+            Parte de <span class="mono">X entradas</span>, cada uma com <span class="mono">Y itens/min</span>,
+            para atender <span class="mono">N saidas</span> com <span class="mono">Z itens/min</span>.
+          </p>
+
+          <div class="grid-2">
+            <div class="field">
+              <label for="throughputInputCount" data-i18n="throughput.inputCountLabel">Quantidade de entradas (X)</label>
+              <input id="throughputInputCount" type="number" min="1" step="1" value="2">
+            </div>
+            <div class="field">
+              <label for="throughputInputRate" data-i18n="throughput.inputRateLabel">Itens por entrada (Y/min)</label>
+              <input id="throughputInputRate" type="number" min="0.01" step="0.01" value="60">
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="field">
+              <label for="throughputOutputCount" data-i18n="throughput.outputCountLabel">Quantidade de saidas (N)</label>
+              <input id="throughputOutputCount" type="number" min="1" step="1" value="3">
+            </div>
+            <div class="field">
+              <label for="throughputOutputRate" data-i18n="throughput.outputRateLabel">Meta por saida (Z/min)</label>
+              <input id="throughputOutputRate" type="number" min="0.01" step="0.01" value="40">
+            </div>
+          </div>
+
+          <div class="toolbar">
+            <button id="throughputCalculateBtn" type="button" data-i18n="throughput.calculate">Calcular cenario</button>
+          </div>
+
+          <div id="throughputNotice" class="notice warn" role="status"></div>
+        </section>
+
+        <section class="panel" data-i18n-aria-label="throughput.resultsPanelAria" aria-label="Resultados da solucao de vazao">
+          <h2 data-i18n="throughput.resultTitle">Resultado operacional</h2>
+          <div class="cards">
+            <article class="card">
+              <span class="small" data-i18n="throughput.cardInputFlow">Fluxo total de entrada</span>
+              <strong id="throughputInputCard">120/min</strong>
+            </article>
+            <article class="card">
+              <span class="small" data-i18n="throughput.cardTargetFlow">Fluxo total desejado</span>
+              <strong id="throughputTargetCard">120/min</strong>
+            </article>
+            <article class="card">
+              <span class="small" data-i18n="throughput.cardBalance">Saldo</span>
+              <strong id="throughputBalanceCard">0/min</strong>
+            </article>
+          </div>
+
+          <article id="throughputSummary" class="scenario-summary is-visible" aria-live="polite"></article>
+
+          <div class="results-table-wrap">
+            <table class="results-table" data-i18n-aria-label="throughput.tableAriaLabel" aria-label="Tabela da solucao de vazao">
+              <thead>
+                <tr>
+                  <th data-i18n="throughput.tableIndicator">Indicador</th>
+                  <th data-i18n="throughput.tableValue">Valor</th>
+                </tr>
+              </thead>
+              <tbody id="throughputResultsBody"></tbody>
+            </table>
+          </div>
+        </section>
       </div>
-
-      <div id="validationNotice" class="notice good"></div>
-
-      <div style="overflow:auto">
-        <table aria-label="Tabela de resultados">
-          <thead>
-            <tr>
-              <th>Fabrica</th>
-              <th>Peso</th>
-              <th>Fracao alvo</th>
-              <th>Fracao obtida</th>
-              <th>Metodo</th>
-              <th>Dispositivos</th>
-              <th>Status</th>
-              <th>Erro</th>
-              <th>Fluxo real (itens/min)</th>
-            </tr>
-          </thead>
-          <tbody id="resultsBody"></tbody>
-        </table>
-      </div>
-
-      <h2>Diagrama de dispositivos</h2>
-      <div id="diagramWrap" class="diagram-wrap"></div>
     </section>
-  </main>
+  </div>
 
   <script type="module" src="js/main.js"></script>
 </body>

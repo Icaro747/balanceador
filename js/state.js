@@ -8,6 +8,7 @@ export const BELT_CAPACITY = {
 };
 
 export const state = {
+  showAdvancedTableColumns: false,
   factories: [
     { name: "Fabrica 1", weight: 1 },
     { name: "Fabrica 2", weight: 1 },

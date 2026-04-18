@@ -1,28 +1,30 @@
-# Balanceamento de Esteiras com Divisores de Fração
+# Balanceamento de esteiras com divisores e unificadores
 
-> **Descritivo Técnico** — Março 2026
+Este documento descreve como a calculadora funciona na pratica: quais entradas ela recebe, quais familias de solucao ela considera, como escolhe a estrategia vencedora e por que alguns cenarios aparecem com um diagrama unico enquanto outros aparecem separados por fabrica.
 
----
+## 1. Objetivo
 
-## 1. Contexto do Problema
+O sistema distribui um fluxo total `F` entre varias fabricas usando apenas:
 
-Em sistemas de produção com múltiplas fábricas ou destinos alimentados por uma única esteira, é necessário distribuir um fluxo de itens entre os destinos de forma controlada. O desafio surge quando as proporções desejadas não coincidem diretamente com as frações que os dispositivos físicos são capazes de produzir.
+- divisores com 2 ou 3 saidas ativas;
+- unificadores com ate 3 entradas.
 
-**Cenário:** 60 itens/min em uma esteira precisam ser divididos entre 5 fábricas com proporções iguais ou configuradas pelo usuário, usando apenas os dispositivos disponíveis.
+Cada fabrica recebe uma parcela do fluxo proporcional ao peso configurado.
 
-### 1.1 Dispositivos disponíveis
+## 2. Entradas do problema
 
-| Dispositivo | Configuração | Comportamento |
-|-------------|-------------|---------------|
-| Divisor | 1 entrada, até 3 saídas | Divide o fluxo igualmente entre as saídas conectadas (÷2 ou ÷3 automático) |
-| Unificador | Até 3 entradas, 1 saída | Soma os fluxos de entrada em uma única saída |
+O calculo depende de:
 
-O divisor funciona como um **balanceador automático**: se apenas 2 das 3 saídas estiverem conectadas, ele divide o fluxo igualmente entre as 2. Não é possível configurar proporções diferentes no mesmo dispositivo.
+- tipo de esteira;
+- fluxo total `F` em itens por minuto;
+- quantidade manual minima de entradas paralelas;
+- profundidade maxima `D`;
+- lista de fabricas com nome e peso.
 
-### 1.2 Capacidade máxima da esteira por tipo (input)
-O **tipo de esteira** é um dos dados de entrada (junto com o fluxo total desejado). Ele define a **vazão máxima por esteira física** e o código **deve** usar esse limite no cálculo e na interpretação do layout: uma única esteira do tipo escolhido nunca transporta mais do que a capacidade da tabela.
-| Tipo | Capacidade máxima (por esteira) |
-|:----:|:-------------------------------:|
+### 2.1 Capacidade por tipo
+
+| Tipo | Capacidade por esteira |
+| --- | --- |
 | t1 | 60/min |
 | t2 | 120/min |
 | t3 | 270/min |
@@ -30,269 +32,223 @@ O **tipo de esteira** é um dos dados de entrada (junto com o fluxo total deseja
 | t5 | 780/min |
 | t6 | 1200/min |
 
-**Esteiras de entrada em paralelo.** Se o fluxo total informado **F** (itens/min) for **maior** que a capacidade **C** do tipo selecionado, não cabe tudo em uma esteira só: presume-se **várias esteiras em paralelo** alimentando o mesmo ponto (ou um unificador antes da árvore de divisão). O número mínimo de esteiras de entrada desse tipo é:
-```
-N = ⌈F / C⌉   (arredondamento para cima)
-```
-Cada uma dessas **N** esteiras leva no máximo **C** itens/min; a soma cobre **F** (com as últimas linhas eventualmente abaixo de **C** se **F** não for múltiplo exato de **C**).
-**Exemplos:** com **t1** (**C = 60**), fluxo **120/min** ⇒ **N = 2** esteiras de entrada; fluxo **123/min** ⇒ **N = ⌈123/60⌉ = 3** esteiras. O balanceamento por frações continua válido sobre o total **F**; o papel de **C** e **N** é dimensionar e, na interface, comunicar quantas linhas de alimentação o cenário exige.
+### 2.2 Entradas paralelas
 
----
-
-## 2. Definição Matemática
-
-### 2.1 Frações alcançáveis
-
-Com os dois dispositivos em cascata, cada saída recebe uma fração do fluxo original da forma:
-
-```
-k / (2^a × 3^b)    onde k, a, b ∈ ℤ≥0  e  0 ≤ k ≤ 2^a × 3^b
-```
-
-Os denominadores possíveis formam a sequência: **1, 2, 3, 4, 6, 8, 9, 12, 18, 24, 36, 48, 72…**
-
-Qualquer fração cujo denominador é composto apenas de fatores 2 e 3 pode ser representada exatamente.
-
-### 2.2 Por que 5 partes iguais é impossível
-
-Dividir em 5 partes iguais exigiria a fração 1/5. Para representá-la como `k/(2^a × 3^b)`, seria necessário que 5 dividisse `2^a × 3^b`. Mas 5 é primo e coprimo com 2 e 3, portanto:
-
-```
-mdc(5, 2^a × 3^b) = 1  para qualquer a, b ≥ 0
-```
-
-Logo, 1/5 nunca é exatamente alcançável. O mesmo vale para qualquer fração com fator primo diferente de 2 ou 3 no denominador (ex.: 1/7, 1/11, 2/15).
-
-### 2.3 Exemplos de frações exatas e aproximadas
-
-| Divisão desejada | Fração | Status | Representação |
-|-----------------|--------|--------|---------------|
-| 2 partes iguais | 1/2 | Exata | `1/(2¹×3⁰)` |
-| 3 partes iguais | 1/3 | Exata | `1/(2⁰×3¹)` |
-| 4 partes iguais | 1/4 | Exata | `1/(2²×3⁰)` |
-| 6 partes iguais | 1/6 | Exata | `1/(2¹×3¹)` |
-| 5 partes iguais | 1/5 | Impossível exato | Melhor: `13/64 ≈ 0.203` |
-| 7 partes iguais | 1/7 | Impossível exato | Melhor: `9/64 ≈ 0.141` |
-
----
-
-## 3. Algoritmo de Solução
-
-### 3.1 Abordagem geral
-
-Antes das frações, o algoritmo usa o **tipo de esteira** (capacidade **C**) e o fluxo total **F** para obter **N = ⌈F/C⌉** esteiras de entrada em paralelo, quando **F > C**. Esse **N** entra na validação da interface e, se desejado, no diagrama (várias entradas ou nota de paralelismo).
-Em seguida:
-1. Calcular a solução **direta** por aproximação racional para cada fração alvo (em função de **F** e dos pesos)
-2. Calcular a solução por **recirculação (loop-back)** quando houver saídas excedentes
-3. Escolher automaticamente o método com melhor custo/qualidade (exatidão primeiro, depois menos dispositivos)
-
-### 3.2 Busca da solução direta (fração ótima)
-
-Para cada fábrica com peso `w_i` (soma total `W`), a fração alvo é `w_i/W`. O algoritmo varre todas as combinações de expoentes `(a, b)` até a profundidade máxima configurada:
-
-```
-Para cada (a, b) com a+b ≤ D:
-  d = 2^a × 3^b
-  k = round(w_i/W × d)
-  erro = |k/d - w_i/W|
-  guardar melhor (k, d) com menor erro
-```
-
-### 3.3 Solução por recirculação (loop-back)
-
-A recirculação é usada quando o denominador mínimo com fatores 2 e 3 é maior que o total necessário de partes. Em vez de descartar saídas, as saídas excedentes retornam ao topo da linha.
-
-Definições:
-- `k_i`: número inteiro de sub-ramos necessários para a fábrica `i` (proporcional ao peso)
-- `S = Σk_i`: total de sub-ramos úteis
-- `d = 2^a × 3^b`: menor denominador alcançável com `a+b ≤ D` e `d ≥ S`
-- `r = d - S`: saídas excedentes recirculadas
-
-Fluxo recirculado:
-
-```
-R = r × F / S
-```
-
-Com isso, cada sub-ramo final passa a transportar `F/S` e a divisão por fábrica fica exata (`k_i × F/S`), mesmo em casos como divisão por 5, 7 ou 10.
-
-### 3.4 Construção da árvore física
-
-Uma vez escolhido o método (direta ou recirculação), o algoritmo converte recursivamente em árvore de divisores:
-
-- Se `b > 0`: inserir um divisor ÷3, processar `k/3` unidades de cada rama ativa
-- Se `a > 0`: inserir um divisor ÷2, processar as duas metades
-- Quando múltiplas ramas convergem para a mesma fábrica: inserir um unificador
-- Folha da árvore: a fábrica receptora
-- Na recirculação: folhas excedentes são conectadas de volta ao topo (loop-back)
-
-**Exemplo:** Para `2/9 = 2/(3²)`: dividir por 3 (3 ramas de 1/3 cada) → de cada rama, dividir por 3 novamente (9 sub-ramas de 1/9) → selecionar 2 sub-ramas → unificar as 2 em um único fluxo de 2/9 para a fábrica.
-
----
-
-### 3.5 Exemplo: 4 fabricas com pesos 1, 1, 1 e 0,5
-
-Este cenario usa **recirculacao** como termo principal. Os termos **loop-back** e **refluxo** podem ser usados como equivalentes para a saida que retorna ao topo da linha.
-
-Pesos configurados:
+Se `F > C`, o sistema precisa de mais de uma esteira de entrada. O numero minimo e:
 
 ```text
-1, 1, 1, 0.5
+N_min = ceil(F / C)
 ```
 
-Normalizando para a menor razao inteira:
+O numero aplicado no calculo e:
 
 ```text
-1 : 1 : 1 : 0.5  ->  2 : 2 : 2 : 1
+N = max(N_min, N_manual)
 ```
 
-Logo, a soma dos ramos uteis e:
+O fluxo por linha fica:
 
 ```text
-S = 2 + 2 + 2 + 1 = 7
+F_linha = F / N
 ```
 
-Como a arvore so pode usar divisores por `2` e por `3`, a menor quantidade de folhas finais que comporta `7` ramos uteis com apenas divisao por `2` e:
+Esse `F_linha` e o valor usado para validar a capacidade das ligacoes internas e para escolher a estrategia.
+
+## 3. Fracoes que o hardware consegue representar
+
+Com cascatas de divisores `2` e `3`, as fracoes exatas possiveis seguem a forma:
 
 ```text
-d = 8
+k / (2^a * 3^b)
 ```
 
-Portanto, a construcao minima exata precisa de:
+Isso significa que:
 
-- `7` folhas uteis
-- `1` folha de retorno
+- fracoes como `1/2`, `1/3`, `1/4`, `1/6` sao exatas;
+- fracoes como `1/5` e `1/7` nao sao exatas por divisao direta;
+- para esses casos, o sistema pode usar aproximacao direta ou uma arvore unificada com loop-back.
 
-### Construcao fisica exata
+## 4. Familias reais de solucao
 
-1. O primeiro andar divide a entrada por `2`.
-2. O segundo andar divide cada uma das duas saidas por `2`.
-3. Isso gera `4` ramos de `1/4` do fluxo efetivo da arvore.
-4. Tres desses ramos de `1/4` seguem diretamente para as tres fabricas de peso `1`.
-5. O quarto ramo de `1/4` e dividido por `2` novamente.
-6. Um sub-ramo de `1/8` vai para a fabrica de peso `0.5`.
-7. O outro sub-ramo de `1/8` retorna para a entrada como recirculacao.
+Na pratica, o sistema trabalha com tres familias de resultado.
 
-Em termos fisicos, a arvore fica:
+### 4.1 `direct`
 
-```text
-Entrada -> /2 -> /2 em ambas as saidas -> 4 ramos de 1/4
+Cada fabrica e resolvida individualmente pela melhor fracao alcancavel ate a profundidade `D`.
 
-3 ramos de 1/4 -> fabricas de peso 1
-1 ramo de 1/4 -> /2 -> 1/8 para a fabrica de peso 0.5
-1 ramo de 1/8 -> retorno para a entrada
-```
+Caracteristicas:
 
-### Logica do resultado
+- pode ser exato ou aproximado;
+- soma o numero de dispositivos por fabrica;
+- quando `N = 1`, a visualizacao costuma ser um diagrama por fabrica.
 
-Considere:
+### 4.2 `unified exact`
 
-- `F`: fluxo novo que entra no sistema
-- `E`: fluxo efetivo que percorre a arvore, ja incluindo a recirculacao
+O sistema encontra uma unica arvore exata para todo o cenario, sem retorno.
 
-Como uma das oito folhas finais retorna ao topo, o fluxo de retorno e:
+Caracteristicas:
 
-```text
-Retorno = E/8
-```
+- existe um unico denominador valido `d = 2^a * 3^b`;
+- `d` coincide com o total util `sum(k)`;
+- `r = d - sum(k) = 0`;
+- o diagrama aparece como um unico cenario unificado;
+- nao existe recirculacao fisica.
 
-O fluxo novo `F` e igual ao fluxo efetivo menos o que foi devolvido para a propria entrada:
+Exemplo:
 
-```text
-F = E - E/8
-F = 7E/8
-E = 8F/7
-```
+- pesos `1,1,1`
+- razao inteira `1,1,1`
+- `sum(k) = 3`
+- `d = 3`
+- `r = 0`
 
-Com isso:
+Resultado: uma arvore unificada exata para as tres fabricas.
 
-- cada ramo de `1/4` da arvore vale `E/4 = 2F/7`
-- o ramo final de `1/8` vale `E/8 = F/7`
+### 4.3 `unified loop-back`
 
-Portanto, o resultado liquido correto e:
+O sistema encontra uma unica arvore exata, mas com saidas excedentes retornando para a entrada.
 
-```text
-Fabrica 1 = 2F/7
-Fabrica 2 = 2F/7
-Fabrica 3 = 2F/7
-Fabrica 4 = F/7
-```
+Caracteristicas:
 
-Isso corresponde exatamente a razao desejada:
+- `d` e maior que `sum(k)`;
+- `r = d - sum(k) > 0`;
+- o retorno aumenta o fluxo efetivo interno da arvore;
+- o resultado liquido entregue para as fabricas continua correto e exato.
 
-```text
-2 : 2 : 2 : 1
-```
+Exemplo:
 
-Ou, voltando para os pesos originais:
+- pesos `1,1,1,1,1`
+- razao inteira `1,1,1,1,1`
+- `sum(k) = 5`
+- menor `d` valido = `6`
+- `r = 1`
 
-```text
-1 : 1 : 1 : 0.5
-```
+Resultado: uma arvore unificada com uma saida de loop-back.
 
-Esse exemplo mostra por que o retorno nao e desperdicio: ele aumenta o fluxo efetivo dentro da arvore ate que as saidas liquidas atinjam os pesos configurados.
+## 5. Como o algoritmo escolhe a estrategia
 
----
+O sistema compara duas candidatas:
 
-## 4. Ferramentas Desenvolvidas
+1. `direct`
+2. `unified`
 
-### 4.1 Calculadora interativa
+Hoje a busca da familia `unified` fica concentrada no solver historicamente chamado de "recirculacao". Esse nome e legado: ele cobre tanto os casos com loop-back quanto os casos unificados exatos sem retorno.
 
-Interface web que permite configurar o problema e calcular as soluções em tempo real.
+### 5.1 Ordem de prioridade
 
-| Funcionalidade | Descrição |
-|---------------|-----------|
-| Tipo de esteira (t1–t6) | Input que fixa a capacidade máxima **C** por esteira; usado para calcular **N = ⌈F/C⌉** quando **F > C** (ver §1.2) |
-| Fluxo configurável | Total **F** de itens/min a distribuir; se **F > C**, o cenário equivale a **N** esteiras em paralelo na entrada |
-| Múltiplas fábricas | Adiciona/remove destinos com pesos individuais |
-| Profundidade máx. | Controla até quantos níveis de cascata são permitidos |
-| Método escolhido | Mostra se a solução final foi **Direta** ou **Recirculação** |
-| Dispositivos | Exibe a estimativa de divisores + unificadores da solução escolhida |
-| Status exato/aprox. | Indica se a fração é exata ou a melhor aproximação possível |
-| Métricas de erro | Mostra o erro absoluto e o fluxo real vs. alvo |
+Entre as candidatas validas, a escolha segue esta ordem:
 
-### 4.2 Visualizador de diagrama físico
+1. capacidade valida;
+2. exatidao global;
+3. menor erro maximo;
+4. menor numero total de dispositivos;
+5. empate final favorece `direct`.
 
-Gera automaticamente o diagrama de ligações físicas para cada fábrica, mostrando como os divisores e unificadores devem ser conectados na prática.
+### 5.2 Consequencia pratica
 
-| Elemento visual | Representação |
-|----------------|---------------|
-| Nó cinza ÷N | Divisor com N saídas ativas e fluxo de entrada |
-| Nó colorido (fábrica) | Destino final com fluxo recebido em itens/min |
-| Setas | Direção do fluxo entre dispositivos |
-| Cor única por fábrica | Facilita identificar qual pipeline serve cada destino |
+Isso explica um comportamento que parecia contraditorio:
 
----
+- um cenario pode nao ter loop-back;
+- ainda assim ele pode vencer como `unified`;
+- nesse caso o diagrama continua sendo unico.
 
-## 5. Limitações Conhecidas e Trabalho Futuro
+Portanto, "diagrama unico" nao significa necessariamente "ha recirculacao". Muitas vezes significa apenas "a melhor estrategia foi uma arvore unificada exata".
 
-### 5.1 Limitações atuais
+## 6. Como o diagrama e escolhido
 
-- Sem recirculação, divisões em 5 ou 7 partes iguais não são exatas; com recirculação, tornam-se exatas ao custo de fluxo de retorno
-- O diagrama atual não exibe o unificador de forma explicitamente separada quando múltiplas ramas convergem
-- Não considera o custo físico (número de dispositivos) como critério de otimização
-- Profundidade máxima de 6 por questões de performance (3⁶ = 729 combinações)
+A renderizacao segue esta ordem:
 
-### 5.2 Melhorias planejadas
+1. se `N > 1`, o sistema mostra um diagrama unificado multi-entrada;
+2. senao, se a estrategia vencedora for `unified`, o sistema mostra um diagrama unico do cenario;
+3. senao, mostra um diagrama por fabrica.
 
-- Exibir os unificadores explicitamente no diagrama quando múltiplas ramas convergem para uma fábrica
-- Adicionar otimização por número mínimo de dispositivos (BFS / programação dinâmica)
-- Exportar o diagrama em formato SVG ou PNG para documentação
-- Suporte a divisores com proporções configuráveis (se o hardware permitir no futuro)
-- Validação de conservação de fluxo: garantir que 100% do fluxo seja distribuído sem desperdício
+Resumo rapido:
 
----
+- `N > 1` sempre unifica a visualizacao;
+- `N = 1` ainda pode gerar diagrama unico;
+- so aparece "um por fabrica" quando o vencedor final e realmente `direct`.
 
-## 6. Referência Rápida
+## 7. Exemplo importante: 3 fabricas iguais com 1 entrada
 
-**Capacidade da esteira por tipo:** t1 60 · t2 120 · t3 270 · t4 480 · t5 780 · t6 1200 (todos em itens/min).
+Configuracao:
 
-**Esteiras de entrada em paralelo:** `N = ⌈F / C⌉` (fluxo total **F**, capacidade do tipo **C**).
+- `F = 60/min`
+- `N = 1`
+- pesos `1,1,1`
 
-| Profundidade | Denominador máx. | Erro máx. em 1/5 | Dispositivos máx. |
-|:-----------:|:----------------:|:----------------:|:-----------------:|
-| 2 | 12 | 3.33% | 2 |
-| 3 | 36 | 1.11% | 3 |
-| 4 | 108 | 1.11% | 4 |
-| 5 | 324 | 0.31% | 5 |
-| 6 | 972 | 0.10% | 6 |
+Passos:
+
+1. a razao inteira ja e `1,1,1`;
+2. `sum(k) = 3`;
+3. `d = 3` e um denominador valido;
+4. `r = 0`;
+5. a familia vencedora e `unified exact`.
+
+Resultado observado:
+
+- metodo: arvore unificada exata;
+- `F_recirc = 0`;
+- `r = 0`;
+- diagrama: unico.
+
+Esse caso e o principal exemplo de que "unificado" e diferente de "recirculacao com retorno".
+
+## 8. Exemplo importante: 4 fabricas com pesos 1,1,1,0.5
+
+Configuracao:
+
+- pesos `1,1,1,0.5`
+- razao inteira `2,2,2,1`
+- `sum(k) = 7`
+- menor `d` valido = `8`
+- `r = 1`
+
+Interpretacao:
+
+- existe uma folha excedente;
+- ela retorna ao topo da arvore;
+- isso produz um fluxo efetivo maior dentro da rede;
+- o resultado liquido final entregue para as fabricas continua exatamente `2/7, 2/7, 2/7, 1/7`.
+
+## 9. O que a UI deve comunicar
+
+Para evitar ambiguidade, a leitura correta da interface depende destes campos:
+
+- `Metodo escolhido`
+- `d`
+- `sum(k)`
+- `r`
+- `F_recirc`
+- quantidade de cards de diagrama
+
+Interpretacao recomendada:
+
+- `Metodo escolhido: arvore unificada exata` + `r=0` -> diagrama unico sem loop-back
+- `Metodo escolhido: recirculacao com loop-back` + `r>0` -> diagrama unico com retorno
+- `Metodo escolhido: direta` -> visualizacao possivelmente separada por fabrica
+
+## 10. Mapeamento para o codigo
+
+Arquivos principais:
+
+- `js/math.js`: calcula candidatas e escolhe a estrategia vencedora
+- `js/ui.js`: monta as mensagens e o contexto exibido na tela
+- `js/diagram.js`: decide se o diagrama sera unico, multi-entrada ou por fabrica
+- `js/tree.js`: constroi a topologia fisica da arvore unificada
+
+Metadados importantes no estado atual:
+
+- `mode = "direct"` ou `mode = "unified"`
+- `unifiedKind = "exact"` ou `unifiedKind = "loopback"`
+- `usesLoopback = true/false`
+
+Esses campos existem para deixar evidente a diferenca entre:
+
+- uma arvore unificada exata sem retorno;
+- uma arvore unificada com loop-back;
+- uma estrategia direta por fabrica.
+
+## 11. Documentos relacionados
+
+- `regras_fluxo_decisao.md`: consolidacao rapida das regras de decisao e renderizacao
+- `cenario_4_fabricas_pesos_1_1_1_0_5.md`: walkthrough detalhado do caso `1,1,1,0.5`

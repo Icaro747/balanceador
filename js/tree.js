@@ -164,6 +164,14 @@ function collectFactoryLeafStats(node, map) {
   }
 }
 
+function countMergersForInputCount(inputCount) {
+  const n = Math.max(0, Math.trunc(inputCount));
+  if (n <= 1) {
+    return 0;
+  }
+  return Math.ceil((n - 1) / 2);
+}
+
 export function buildMinimalRecirculationTopology(recirc, factories, totalFlow) {
   const factors = [
     ...Array.from({ length: recirc.b }, () => 3),
@@ -261,16 +269,35 @@ export function countMinimalTopologyDevices(topology) {
     return 0;
   }
 
+  function collectFactoryInputs(node, stats) {
+    if (!node) {
+      return;
+    }
+    if (node.type === "factoryLeaf") {
+      const current = stats.get(node.factoryIndex) || 0;
+      stats.set(node.factoryIndex, current + 1);
+      return;
+    }
+    if (node.type === "splitter") {
+      node.children.forEach((child) => collectFactoryInputs(child, stats));
+    }
+  }
+
   if (!topology) {
     return 0;
   }
 
+  const splitRoot = topology.type === "sourceMerge" ? topology.child : topology;
+  const factoryInputs = new Map();
+  collectFactoryInputs(splitRoot, factoryInputs);
+  const factoryMergerCount = Array.from(factoryInputs.values())
+    .reduce((acc, inputCount) => acc + countMergersForInputCount(inputCount), 0);
+
   if (topology.type === "sourceMerge") {
-    const mergerCount = topology.factoryMergers?.length || 0;
-    return 1 + mergerCount + countNode(topology.child);
+    return 1 + factoryMergerCount + countNode(topology.child);
   }
 
-  return countNode(topology);
+  return factoryMergerCount + countNode(topology);
 }
 
 export function buildUnifiedRecirculationTree(recirc, factories, totalFlow) {
