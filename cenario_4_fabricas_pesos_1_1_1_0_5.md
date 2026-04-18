@@ -23,15 +23,15 @@ Logo, o sistema precisa entregar `7` partes uteis no total.
 ```mermaid
 flowchart TD
     IN["Entrada nova: F"] --> ROOT["Fluxo efetivo na arvore: E"]
-    ROOT --> D1{"/2"}
-    D1 --> D2A{"/2"}
-    D1 --> D2B{"/2"}
+    ROOT --> D1{"1/2"}
+    D1 --> D2A{"1/2"}
+    D1 --> D2B{"1/2"}
 
     D2A --> F1["Fabrica 1<br/>1/4 de E = 2F/7"]
     D2A --> F2["Fabrica 2<br/>1/4 de E = 2F/7"]
 
     D2B --> F3["Fabrica 3<br/>1/4 de E = 2F/7"]
-    D2B --> D3{"/2"}
+    D2B --> D3{"1/2"}
 
     D3 --> F4["Fabrica 4 (peso 0.5)<br/>1/8 de E = F/7"]
     D3 --> R["Recirculacao / loop-back / refluxo<br/>1/8 de E = F/7"]

@@ -11,6 +11,7 @@ function createDefaultFactories() {
 }
 
 function resetState() {
+  state.showAdvancedTableColumns = false;
   state.factories.splice(0, state.factories.length, ...createDefaultFactories());
 }
 
@@ -26,6 +27,7 @@ function mountFixture() {
         <option value="t6">t6</option>
       </select>
       <input id="flowInput" type="number" value="60">
+      <input id="manualLanesInput" type="number" value="1">
       <input id="depthInput" type="range" min="2" max="6" value="4">
       <span id="depthValue">4</span>
       <input id="factoryCount" type="number" value="5">
@@ -36,7 +38,9 @@ function mountFixture() {
       <strong id="parallelCard"></strong>
       <strong id="maxErrorCard"></strong>
       <div id="validationNotice"></div>
-      <table><tbody id="resultsBody"></tbody></table>
+      <article id="scenarioSummary"></article>
+      <button id="toggleAdvancedColumnsBtn" type="button"></button>
+      <table id="resultsTable" class="results-table"><tbody id="resultsBody"></tbody></table>
       <div id="diagramWrap"></div>
     </main>
   `;
@@ -65,18 +69,26 @@ describe("ui flows", () => {
     expect(app.refs.parallelCard.textContent).toBe("0");
   });
 
-  it("shows a single belt or multiple parallel belts according to flow and capacity", () => {
+  it("applies N = max(N_min, N_manual) and updates per-line preview", () => {
     const { app } = createApp();
 
     app.refs.beltType.value = "t1";
     app.refs.flowInput.value = "60";
+    app.refs.manualLanesInput.value = "1";
     app.updateBeltPreview();
     expect(app.refs.beltPreview.textContent).toContain("Uma esteira t1 suporta este fluxo");
 
     app.refs.flowInput.value = "123";
+    app.refs.manualLanesInput.value = "1";
     app.updateBeltPreview();
-    expect(app.refs.beltPreview.textContent).toContain("Sao necessarias 3 esteiras t1 em paralelo");
+    expect(app.refs.beltPreview.textContent).toContain("N_min=3");
     expect(app.refs.parallelCard.textContent).toBe("3");
+
+    app.refs.flowInput.value = "120";
+    app.refs.manualLanesInput.value = "4";
+    app.updateBeltPreview();
+    expect(app.refs.beltPreview.textContent).toContain("N_manual=4");
+    expect(app.refs.parallelCard.textContent).toBe("4");
   });
 
   it("clears the results when the inputs are invalid", () => {
@@ -114,17 +126,43 @@ describe("ui flows", () => {
     );
   });
 
-  it("shows the recirculation notice and zero max error for five equal factories", () => {
+  it("uses effective solution depth for implementation difficulty instead of configured depth", () => {
+    const { app } = createApp();
+
+    app.setFactoryCount(1);
+    app.renderFactoryRows();
+
+    app.refs.depthInput.value = "6";
+    app.refs.depthValue.textContent = "6";
+    app.calculate();
+    expect(app.refs.scenarioSummary.textContent).toContain("Dificuldade de implementacao:");
+    expect(app.refs.scenarioSummary.textContent).toContain("D efetivo da solucao=0");
+    expect(app.refs.scenarioSummary.textContent).toContain("D=2 -> facil");
+    expect(app.refs.scenarioSummary.textContent).not.toContain("D=6 -> pesadelo");
+  });
+
+  it("falls back to direct mode when recirculation violates the belt capacity", () => {
     const { app, renderDiagramsFn } = createApp();
 
-    expect(app.refs.validationNotice.textContent).toContain("Metodo escolhido: recirculacao");
-    expect(app.refs.maxErrorCard.textContent).toBe("0%");
+    expect(app.refs.validationNotice.textContent).toContain("A soma das fracoes obtidas");
+    expect(app.refs.maxErrorCard.textContent).not.toBe("n/d");
     expect(app.refs.resultsBody.children).toHaveLength(5);
     expect(renderDiagramsFn).toHaveBeenCalledWith(
       app.refs,
       expect.any(Array),
-      expect.objectContaining({ mode: "recirculation", totalFlow: 60 })
+      expect.objectContaining({ mode: "direct", totalFlow: 60, inputLanes: 1 })
     );
+  });
+
+  it("keeps advanced table columns hidden by default and toggles visibility on demand", () => {
+    const { app } = createApp();
+
+    expect(app.refs.resultsTable.classList.contains("show-advanced")).toBe(false);
+    expect(app.refs.toggleAdvancedColumnsBtn.textContent).toContain("Mostrar");
+
+    app.toggleAdvancedColumnsVisibility();
+    expect(app.refs.resultsTable.classList.contains("show-advanced")).toBe(true);
+    expect(app.refs.toggleAdvancedColumnsBtn.textContent).toContain("Ocultar");
   });
 
   it("shows F, F_recirc and E in the recirculation notice and uses the minimized device count", () => {
@@ -137,13 +175,15 @@ describe("ui flows", () => {
 
     mountFixture();
     const app = initApp(document);
+    app.refs.manualLanesInput.value = "2";
     const result = app.calculate();
     const rows = Array.from(app.refs.resultsBody.querySelectorAll("tr"));
 
-    expect(result.chosen.mode).toBe("recirculation");
-    expect(app.refs.validationNotice.textContent).toContain("F=60");
-    expect(app.refs.validationNotice.textContent).toContain("F_recirc=8,5714");
-    expect(app.refs.validationNotice.textContent).toContain("E=68,5714");
+    expect(result.chosen.mode).toBe("unified");
+    expect(app.refs.validationNotice.textContent).toContain("N=2");
+    expect(app.refs.validationNotice.textContent).toContain("F_linha=30");
+    expect(app.refs.validationNotice.textContent).toContain("F_recirc=4,2857");
+    expect(app.refs.validationNotice.textContent).toContain("E=34,2857");
     expect(rows.map((row) => row.children[5].textContent)).toEqual(["5", "5", "5", "5"]);
   });
 
@@ -158,12 +198,13 @@ describe("ui flows", () => {
     const { app, renderDiagramsFn } = createApp();
     renderDiagramsFn.mockClear();
 
+    app.refs.manualLanesInput.value = "2";
     const result = app.calculate();
     const rows = Array.from(app.refs.resultsBody.querySelectorAll("tr"));
 
-    expect(result.chosen.mode).toBe("recirculation");
+    expect(result.chosen.mode).toBe("unified");
     expect(app.refs.maxErrorCard.textContent).toBe("0%");
-    expect(app.refs.validationNotice.textContent).toContain("Metodo escolhido: recirculacao");
+    expect(app.refs.validationNotice.textContent).toContain("Metodo escolhido: recirculacao com loop-back");
     expect(app.refs.validationNotice.textContent).toContain("d=8");
     expect(app.refs.validationNotice.textContent).toContain("sum(k)=7");
     expect(app.refs.validationNotice.textContent).toContain("r=1");
@@ -183,8 +224,76 @@ describe("ui flows", () => {
     expect(renderDiagramsFn).toHaveBeenCalledWith(
       app.refs,
       expect.any(Array),
-      expect.objectContaining({ mode: "recirculation", totalFlow: 60 })
+      expect.objectContaining({ mode: "unified", totalFlow: 30, inputLanes: 2 })
     );
+  });
+
+  it("describes three equal factories as a unified exact tree without loop-back", () => {
+    state.factories.splice(0, state.factories.length,
+      { name: "Fabrica 1", weight: 1 },
+      { name: "Fabrica 2", weight: 1 },
+      { name: "Fabrica 3", weight: 1 }
+    );
+
+    const { app, renderDiagramsFn } = createApp();
+    renderDiagramsFn.mockClear();
+
+    const result = app.calculate();
+
+    expect(result.chosen.mode).toBe("unified");
+    expect(result.chosen.unifiedKind).toBe("exact");
+    expect(app.refs.validationNotice.textContent).toContain("Metodo escolhido: arvore unificada exata");
+    expect(app.refs.validationNotice.textContent).toContain("r=0");
+    expect(app.refs.validationNotice.textContent).toContain("F_recirc=0");
+    expect(renderDiagramsFn).toHaveBeenCalledWith(
+      app.refs,
+      expect.any(Array),
+      expect.objectContaining({ mode: "unified", totalFlow: 60, inputLanes: 1 })
+    );
+  });
+
+  it("renders explicit entrada 1 and entrada 2 nodes for 120/min in t1 with four equal factories", () => {
+    state.factories.splice(0, state.factories.length,
+      { name: "Fabrica 1", weight: 1 },
+      { name: "Fabrica 2", weight: 1 },
+      { name: "Fabrica 3", weight: 1 },
+      { name: "Fabrica 4", weight: 1 }
+    );
+
+    mountFixture();
+    const app = initApp(document);
+    app.refs.beltType.value = "t1";
+    app.refs.flowInput.value = "120";
+    app.refs.manualLanesInput.value = "1";
+    app.calculate();
+
+    const textValues = Array.from(app.refs.diagramWrap.querySelectorAll("text"))
+      .map((node) => node.textContent);
+    expect(textValues).toContain("entrada 1");
+    expect(textValues).toContain("entrada 2");
+    expect(textValues).toContain("Fabrica 1");
+    expect(textValues).toContain("Fabrica 4");
+  });
+
+  it("renders a merger when one factory is fed by two 60/min entradas", () => {
+    state.factories.splice(0, state.factories.length,
+      { name: "Fabrica 1", weight: 1 }
+    );
+
+    mountFixture();
+    const app = initApp(document);
+    app.refs.beltType.value = "t1";
+    app.refs.flowInput.value = "120";
+    app.refs.manualLanesInput.value = "1";
+    app.calculate();
+
+    const textValues = Array.from(app.refs.diagramWrap.querySelectorAll("text"))
+      .map((node) => node.textContent);
+    const mergerCount = textValues.filter((text) => text === "UNIFICADOR").length;
+    expect(textValues).toContain("entrada 1");
+    expect(textValues).toContain("entrada 2");
+    expect(mergerCount).toBeGreaterThanOrEqual(1);
+    expect(textValues).toContain("Fabrica 1");
   });
 
   it("updates the factory list when the requested count changes", () => {

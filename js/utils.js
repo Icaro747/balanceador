@@ -1,5 +1,7 @@
+import { getIntlLocale } from "./i18n/index.js";
+
 export function formatNumber(value, digits = 3) {
-  return Number(value).toLocaleString("pt-BR", {
+  return Number(value).toLocaleString(getIntlLocale(), {
     minimumFractionDigits: 0,
     maximumFractionDigits: digits
   });

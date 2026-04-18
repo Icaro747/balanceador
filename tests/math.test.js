@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  countMergersForInputCount,
   chooseBestApproach,
   findBestFraction,
   findRecirculationSolution,
@@ -52,6 +53,16 @@ describe("math helpers", () => {
       { weight: 0.00001 },
       { weight: 0.00002 }
     ])).toEqual([1, 1]);
+  });
+
+  it("counts merger cascades with a 3-input limit per block", () => {
+    expect(countMergersForInputCount(0)).toBe(0);
+    expect(countMergersForInputCount(1)).toBe(0);
+    expect(countMergersForInputCount(2)).toBe(1);
+    expect(countMergersForInputCount(3)).toBe(1);
+    expect(countMergersForInputCount(4)).toBe(2);
+    expect(countMergersForInputCount(5)).toBe(2);
+    expect(countMergersForInputCount(6)).toBe(3);
   });
 });
 
@@ -163,6 +174,50 @@ describe("recirculation search", () => {
     });
   });
 
+  it("finds the exact 2:1 split for weights 1 and 0.5 without loop-back and with cascade device count", () => {
+    const factories = [
+      { name: "Fabrica 1", weight: 1 },
+      { name: "Fabrica 2", weight: 0.5 }
+    ];
+    const solution = findRecirculationSolution(factories, 4, 60);
+
+    expect(solution).toMatchObject({
+      mode: "direct-exact",
+      solutionFamily: "unified",
+      unifiedKind: "exact",
+      usesLoopback: false,
+      d: 3,
+      sumK: 3,
+      kValues: [2, 1],
+      loopbackCount: 0,
+      totalDevices: 2
+    });
+    expect(solution.topology.type).toBe("splitter");
+    expect(solution.rows.map((row) => row.realFlow)).toEqual([40, 20]);
+  });
+
+  it("finds the exact 5:4 split for weights 1 and 0.8 without loop-back and keeps merger count consistent", () => {
+    const factories = [
+      { name: "Fabrica 1", weight: 1 },
+      { name: "Fabrica 2", weight: 0.8 }
+    ];
+    const solution = findRecirculationSolution(factories, 4, 60);
+
+    expect(solution).toMatchObject({
+      mode: "direct-exact",
+      solutionFamily: "unified",
+      unifiedKind: "exact",
+      usesLoopback: false,
+      d: 9,
+      sumK: 9,
+      kValues: [5, 4],
+      loopbackCount: 0,
+      totalDevices: 4
+    });
+    expect(solution.topology.type).toBe("splitter");
+    expect(solution.rows.map((row) => row.realFlow)).toEqual([60 * (5 / 9), 60 * (4 / 9)]);
+  });
+
   it("handles the 'leftover 10 returns to input' case without recursive compounding", () => {
     const factories = Array.from({ length: 5 }, (_, index) => ({
       name: `Fabrica ${index + 1}`,
@@ -241,7 +296,8 @@ describe("approach selection", () => {
 
     const result = chooseBestApproach(factories, 4, 60);
 
-    expect(result.mode).toBe("recirculation");
+    expect(result.mode).toBe("unified");
+    expect(result.unifiedKind).toBe("loopback");
     expect(result.recirc).toMatchObject({
       d: 6,
       sumK: 5,
@@ -267,7 +323,8 @@ describe("approach selection", () => {
 
     const result = chooseBestApproach(factories, 4, 60);
 
-    expect(result.mode).toBe("recirculation");
+    expect(result.mode).toBe("unified");
+    expect(result.unifiedKind).toBe("loopback");
     expect(result.recirc).toMatchObject({
       d: 8,
       sumK: 7,
@@ -279,5 +336,90 @@ describe("approach selection", () => {
       120 / 7,
       60 / 7
     ]);
+  });
+
+  it("falls back to direct when recirculation exceeds belt capacity for the selected lane flow", () => {
+    const factories = Array.from({ length: 5 }, (_, index) => ({
+      name: `Fabrica ${index + 1}`,
+      weight: 1
+    }));
+
+    const result = chooseBestApproach(factories, 4, 60, {
+      beltCapacity: 60,
+      inputLanes: 1,
+      flowPerLane: 60
+    });
+
+    expect(result.mode).toBe("direct");
+    expect(result.capacity.valid).toBe(true);
+  });
+
+  it("allows recirculation again when manual parallel inputs reduce per-line flow", () => {
+    const factories = Array.from({ length: 5 }, (_, index) => ({
+      name: `Fabrica ${index + 1}`,
+      weight: 1
+    }));
+
+    const result = chooseBestApproach(factories, 4, 30, {
+      beltCapacity: 60,
+      inputLanes: 2,
+      flowPerLane: 30
+    });
+
+    expect(result.mode).toBe("unified");
+    expect(result.unifiedKind).toBe("loopback");
+    expect(result.capacity.valid).toBe(true);
+    expect(result.recirc.effectiveInput).toBeCloseTo(36, 10);
+  });
+
+  it("returns blocked when every strategy violates the per-line belt capacity", () => {
+    const factories = [
+      { name: "Fabrica 1", weight: 1 },
+      { name: "Fabrica 2", weight: 1 }
+    ];
+    const result = chooseBestApproach(factories, 4, 120, {
+      beltCapacity: 60,
+      inputLanes: 1,
+      flowPerLane: 120
+    });
+
+    expect(result.mode).toBe("blocked");
+    expect(result.capacityBlocked).toBe(true);
+    expect(result.capacityFailures.length).toBeGreaterThan(0);
+  });
+
+  it("chooses recirculation for weights 1 and 0.8 and uses cascade-aware device count", () => {
+    const factories = [
+      { name: "Fabrica 1", weight: 1 },
+      { name: "Fabrica 2", weight: 0.8 }
+    ];
+    const result = chooseBestApproach(factories, 4, 60);
+
+    expect(result.mode).toBe("unified");
+    expect(result.unifiedKind).toBe("exact");
+    expect(result.recirc).toMatchObject({
+      d: 9,
+      kValues: [5, 4],
+      loopbackCount: 0,
+      totalDevices: 4
+    });
+  });
+
+  it("classifies three equal factories as a unified exact scenario without loop-back", () => {
+    const factories = Array.from({ length: 3 }, (_, index) => ({
+      name: `Fabrica ${index + 1}`,
+      weight: 1
+    }));
+
+    const result = chooseBestApproach(factories, 4, 60);
+
+    expect(result.mode).toBe("unified");
+    expect(result.unifiedKind).toBe("exact");
+    expect(result.recirc).toMatchObject({
+      d: 3,
+      sumK: 3,
+      loopbackCount: 0,
+      usesLoopback: false
+    });
   });
 });
